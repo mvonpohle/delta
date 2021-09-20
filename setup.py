@@ -48,6 +48,7 @@ setuptools.setup(
     install_requires=[
         'tensorflow<2.5',
         'tensorflow_addons',
+        'tensorboard-plugin-profile',
         'usgs<0.3',
         'scipy',
         'matplotlib',
