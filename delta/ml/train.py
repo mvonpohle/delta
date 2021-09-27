@@ -23,6 +23,7 @@ import datetime
 import os
 import tempfile
 import shutil
+import json
 
 import mlflow
 import numpy as np
@@ -77,10 +78,11 @@ def _devices(num_gpus):
 def _strategy(devices):
     '''Given a list of TensorFlow Logical Devices, returns a distribution strategy.'''
     strategy = None
-    if len(devices) == 1:
-        strategy = tf.distribute.OneDeviceStrategy(device=devices[0])
-    else:
-        strategy = tf.distribute.MirroredStrategy(devices=devices)
+#     if len(devices) == 1:
+#         strategy = tf.distribute.OneDeviceStrategy(device=devices[0])
+#     else:
+#         strategy = tf.distribute.MirroredStrategy(devices=devices)
+    strategy = tf.distribute.MultiWorkerMirroredStrategy()
     return strategy
 
 def _prep_datasets(ids, tc):
@@ -259,7 +261,7 @@ class ContinueTrainingException(Exception):
         self.recompile_model = recompile_model
         self.learning_rate = learning_rate
 
-def compile_model(model_fn, training_spec, resume_path=None):
+def compile_model(model_fn, training_spec, resume_path=None, strategy=None):
     """
     Compile and check that the model is valid.
 
@@ -279,6 +281,7 @@ def compile_model(model_fn, training_spec, resume_path=None):
     """
     if not hasattr(training_spec, 'strategy'):
         training_spec.strategy = _strategy(_devices(config.general.gpus()))
+#         training_spec.strategy = strategy
     with training_spec.strategy.scope():
         model = model_fn()
         assert isinstance(model, tf.keras.models.Model), \
@@ -309,7 +312,7 @@ def compile_model(model_fn, training_spec, resume_path=None):
 
     return model
 
-def train(model_fn, dataset : ImageryDataset, training_spec, resume_path=None, internal_model_extension='.h5'):
+def train(model_fn, dataset : ImageryDataset, training_spec, resume_path=None, internal_model_extension='.h5', worker_id=0, strategy=None):
     """
     Trains the specified model on a dataset according to a training
     specification.
@@ -330,7 +333,17 @@ def train(model_fn, dataset : ImageryDataset, training_spec, resume_path=None, i
     (tensorflow.keras.models.Model, History):
         The trained model and the training history.
     """
-    model = compile_model(model_fn, training_spec, resume_path)
+    
+#     os.environ['TF_CONFIG'] = json.dumps({
+#         'cluster': {
+#             'worker': ["r101i1n0:", "r101i1n2"]
+#         },
+#         'task': {'type': 'worker', 'index': worker_id}
+#     })
+#     print(f'TF_CONFIG: {os.environ["TF_CONFIG"]}')
+        
+#     model = compile_model(model_fn, training_spec, resume_path)
+    model = compile_model(model_fn, training_spec, resume_path, strategy)
     assert model.input_shape[3] == dataset.num_bands(), 'Number of bands in model does not match data.'
     # last element differs for the sparse metrics
     assert model.output_shape[1:-1] == dataset.output_shape()[:-1] or (model.output_shape[1] is None), \
@@ -372,37 +385,38 @@ def train(model_fn, dataset : ImageryDataset, training_spec, resume_path=None, i
             history = model.evaluate(validation, steps=training_spec.validation.steps,
                                      callbacks=callbacks, verbose=1)
 
-        if config.mlflow.enabled():
-            model_path = os.path.join(mcb.temp_dir, 'final_model' + internal_model_extension)
-            print('\nFinished, saving model to %s.'
-                  % (mlflow.get_artifact_uri() + '/final_model' + internal_model_extension))
-            save_model(model, model_path)
-            mlflow.log_artifact(model_path)
-            if os.path.isdir(model_path):
-                shutil.rmtree(model_path)
-            else:
-                os.remove(model_path)
-            mlflow.log_param('Status', 'Completed')
+#         if config.mlflow.enabled():
+#             model_path = os.path.join(mcb.temp_dir, 'final_model' + internal_model_extension)
+#             print('\nFinished, saving model to %s.'
+#                   % (mlflow.get_artifact_uri() + '/final_model' + internal_model_extension))
+#             save_model(model, model_path)
+#             mlflow.log_artifact(model_path)
+#             if os.path.isdir(model_path):
+#                 shutil.rmtree(model_path)
+#             else:
+#                 os.remove(model_path)
+#             mlflow.log_param('Status', 'Completed')
     except:
-        if config.mlflow.enabled():
-            mlflow.log_param('Status', 'Aborted')
-            mlflow.log_param('Epoch', mcb.epoch)
-            mlflow.log_param('Batch', mcb.batch)
-            mlflow.end_run('FAILED')
-            model_path = os.path.join(mcb.temp_dir, 'aborted_model' + internal_model_extension)
-            print('\nAborting, saving current model to %s.'
-                  % (mlflow.get_artifact_uri() + '/aborted_model' + internal_model_extension))
-            save_model(model, model_path)
-            mlflow.log_artifact(model_path)
-            if os.path.isdir(model_path):
-                shutil.rmtree(model_path)
-            else:
-                os.remove(model_path)
-        raise
-    finally:
-        if config.mlflow.enabled():
-            if mcb and mcb.temp_dir:
-                shutil.rmtree(mcb.temp_dir)
-            mlflow.end_run()
+        pass
+#         if config.mlflow.enabled():
+#             mlflow.log_param('Status', 'Aborted')
+#             mlflow.log_param('Epoch', mcb.epoch)
+#             mlflow.log_param('Batch', mcb.batch)
+#             mlflow.end_run('FAILED')
+#             model_path = os.path.join(mcb.temp_dir, 'aborted_model' + internal_model_extension)
+#             print('\nAborting, saving current model to %s.'
+#                   % (mlflow.get_artifact_uri() + '/aborted_model' + internal_model_extension))
+#             save_model(model, model_path)
+#             mlflow.log_artifact(model_path)
+#             if os.path.isdir(model_path):
+#                 shutil.rmtree(model_path)
+#             else:
+#                 os.remove(model_path)
+#         raise
+#     finally:
+#         if config.mlflow.enabled():
+#             if mcb and mcb.temp_dir:
+#                 shutil.rmtree(mcb.temp_dir)
+#             mlflow.end_run()
 
     return model, history

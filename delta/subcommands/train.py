@@ -26,6 +26,9 @@ import time
 #logging.getLogger("tensorflow").setLevel(logging.DEBUG)
 
 import tensorflow as tf
+from multiprocessing import Process, Queue
+import json
+import os
 
 from delta.config import config
 from delta.imagery import imagery_dataset
@@ -35,8 +38,11 @@ from delta.ml.io import save_model, load_model
 
 #tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.DEBUG)
 
-def main(options):
-
+def main(options, worker_id):
+#     print('PRINTTTTT', options)
+#     aaa
+#     options = {'remote': False, 'autoencoder': True}
+    
     images = config.dataset.images()
     if not images:
         print('No images specified.', file=sys.stderr)
@@ -86,10 +92,38 @@ def main(options):
     internal_model_extension = '.savedmodel'
     if options.model and ('.h5' in options.model):
         internal_model_extension = '.h5'
+        
+#     devices = [x.name for x in tf.config.list_logical_devices('GPU')]
+    os.environ['TF_CONFIG'] = json.dumps({
+        'cluster': {
+            'worker': ["r101i1n0:", "r101i1n2"]
+        },
+        'task': {'type': 'worker', 'index': worker_id}
+    })
+    print(f'TF_CONFIG: {os.environ["TF_CONFIG"]}')
+    strategy = tf.distribute.MultiWorkerMirroredStrategy()
+#     strategy = tf.distribute.MirroredStrategy(devices=devices)
+    
     try:
-        model, _ = train(model, ids, config.train.spec(), options.resume, internal_model_extension)
+#         NUM_WORKERS = 2  # 2
+#         procs, proc_queues = [], []
+#         for worker_id in range(NUM_WORKERS):
+# #             procs.append(Process(target=train, args=(model, ids, config.train.spec(), options.resume, internal_model_extension, worker_id, strategy)))
+#             procs.append(Process(target=train, args=(model, ids, config.train.spec(), options.resume, internal_model_extension, worker_id)))
+#             proc_queues.append(Queue())
+            
+#         for proc in procs:
+#             proc.start()
+        
+#         for q_i, q in enumerate(proc_queues):
+#             if q_i == 0:
+#                 model = q.get()
+        
+#         model, _ = train(model, ids, config.train.spec(), options.resume, internal_model_extension)
+#         model, _ = train(model, ids, config.train.spec(), options.resume, internal_model_extension, 1, strategy)
+        model, _ = train(model, ids, config.train.spec(), options.resume, internal_model_extension, worker_id, strategy)
 
-        if options.model is not None:
+        if options.model is not None:  #  and worker_id == 0:
             save_model(model, options.model)
     except KeyboardInterrupt:
         print('Training cancelled.')

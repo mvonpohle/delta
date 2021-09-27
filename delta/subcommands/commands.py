@@ -18,7 +18,11 @@
 """
 Lists all avaiable commands.
 """
+
+import os
 from delta.config import config
+
+from multiprocessing import Process, Queue
 
 #pylint:disable=import-outside-toplevel
 
@@ -29,7 +33,17 @@ def main_classify(options):
 
 def main_train(options):
     from . import train
-    train.main(options)
+#     train.main(options)
+
+    NUM_WORKERS = 2  # 2
+    procs, proc_queues = [], []
+    for worker_id in range(NUM_WORKERS):
+        procs.append(Process(target=train.main, args=(options, worker_id)))
+        proc_queues.append(Queue())
+
+    for proc in procs:
+        proc.start()
+
 
 def main_mlflow_ui(options):
     from .import mlflow_ui
