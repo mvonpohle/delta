@@ -223,7 +223,7 @@ def _build_callbacks(model, dataset, training_spec, model_extension):
                                              update_freq='epoch',
                                              histogram_freq=1,
                                              write_images=True,
-                                             embeddings_freq=1, profile_batch=(2,100))
+                                             embeddings_freq=1, profile_batch=(1,4000))
         callbacks.append(tcb)
 
     callbacks.extend(config_callbacks())
