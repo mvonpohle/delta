@@ -1,0 +1,6 @@
+{
+    "cluster": {
+        "worker": ["r101i2n12.pbspl4.nas.nasa.gov", "r101i2n13.pbspl4.nas.nasa.gov"]
+    },
+    "task": {"type": "worker", "index": -1}
+}

@@ -1,0 +1,9 @@
+r101i2n9
+GPU-97bd14b8-ef55-fc16-08cd-e08316d1af55
+TF_CONFIG='{"cluster": {"worker": ["r101i2n9:12345", "r101i2n11:23456"]}, "task": {"type": "worker", "index": 0} }'
+export TF_CONFIG
+
+r101i2n11
+GPU-d090c497-9f20-71ca-53df-d3dcc60304a9
+TF_CONFIG='{"cluster": {"worker": ["r101i2n9:12345", "r101i2n11:23456"]}, "task": {"type": "worker", "index": 1} }'
+export TF_CONFIG
