@@ -1,0 +1,4 @@
+{"cluster": 
+ {"worker": ["r101i2n15:12345", "r101i2n16:23456"]}, 
+ "task": {"type": "worker", "index": -1} 
+}

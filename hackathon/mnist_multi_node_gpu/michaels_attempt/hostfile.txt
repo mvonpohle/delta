@@ -1,0 +1,3 @@
+# List hostnames to be used as workers for distributing the training
+r101i2n15
+r101i2n16
